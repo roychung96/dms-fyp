@@ -1,11 +1,11 @@
-"use client"
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FaEdit, FaTrash, FaPlus } from 'react-icons/fa';
-import { Label } from "@/components/ui/label"
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogTrigger,
@@ -15,23 +15,22 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
-} from "@/components/ui/dialog"
-
-// Dummy data for demonstration
-const initialUsers = [
-  { id: 1, name: 'John Doe', email: 'john@example.com', role: 'manager' },
-  { id: 2, name: 'Jane Smith', email: 'jane@example.com', role: 'salesperson' },
-];
+} from "@/components/ui/dialog";
+import { supabase } from '@/lib/supabaseClient';
 
 const UsersPage = () => {
-  const [users, setUsers] = useState(initialUsers);
+  const [users, setUsers] = useState([]);
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'salesperson' });
   const [isManager, setIsManager] = useState(true); // Assume current user is manager for demo purposes
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    // Fetch users from API when component mounts
-    // For now, we're using dummy data
+    const fetchUsers = async () => {
+      const { data } = await supabase.from('users').select('*');
+      setUsers(data);
+    };
+
+    fetchUsers();
   }, []);
 
   const handleInputChange = (e) => {
@@ -39,13 +38,17 @@ const UsersPage = () => {
     setNewUser({ ...newUser, [name]: value });
   };
 
-  const handleAddUser = () => {
-    setUsers([...users, { ...newUser, id: users.length + 1 }]);
-    setNewUser({ name: '', email: '', role: 'salesperson' });
-    setShowModal(false);
+  const handleAddUser = async () => {
+    const { data, error } = await supabase.from('users').insert([newUser]);
+    if (!error) {
+      setUsers([...users, data[0]]);
+      setNewUser({ name: '', email: '', role: 'salesperson' });
+      setShowModal(false);
+    }
   };
 
-  const handleDeleteUser = (id) => {
+  const handleDeleteUser = async (id) => {
+    await supabase.from('users').delete().eq('id', id);
     setUsers(users.filter(user => user.id !== id));
   };
 

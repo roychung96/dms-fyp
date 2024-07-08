@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
@@ -14,23 +14,22 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import Image from 'next/image';
-
-// Dummy data for demonstration
-const initialStock = [
-  { id: 1, brand: 'Toyota', model: 'Camry', year: 2021, engine: '2.5L', price: 24000, status: 'on sales', photo: '/car1.jpg' },
-  { id: 2, brand: 'Honda', model: 'Civic', year: 2020, engine: '1.8L', price: 20000, status: 'incoming', photo: '/car2.jpg' },
-];
+import { supabase } from '@/lib/supabaseClient';
 
 const StockPage = () => {
-  const [stock, setStock] = useState(initialStock);
+  const [stock, setStock] = useState([]);
   const [newStock, setNewStock] = useState({ brand: '', model: '', year: '', engine: '', price: '', status: 'incoming', photo: '' });
   const [isManager, setIsManager] = useState(true); // Assume current user is manager for demo purposes
 
   useEffect(() => {
-    // Fetch stock from API when component mounts
-    // For now, we're using dummy data
+    const fetchStock = async () => {
+      const { data } = await supabase.from('stock').select('*');
+      setStock(data);
+    };
+
+    fetchStock();
   }, []);
 
   const handleInputChange = (e) => {
@@ -38,12 +37,16 @@ const StockPage = () => {
     setNewStock({ ...newStock, [name]: value });
   };
 
-  const handleAddStock = () => {
-    setStock([...stock, { ...newStock, id: stock.length + 1 }]);
-    setNewStock({ brand: '', model: '', year: '', engine: '', price: '', status: 'incoming', photo: '' });
+  const handleAddStock = async () => {
+    const { data, error } = await supabase.from('stock').insert([newStock]);
+    if (!error) {
+      setStock([...stock, data[0]]);
+      setNewStock({ brand: '', model: '', year: '', engine: '', price: '', status: 'incoming', photo: '' });
+    }
   };
 
-  const handleDeleteStock = (id) => {
+  const handleDeleteStock = async (id) => {
+    await supabase.from('stock').delete().eq('id', id);
     setStock(stock.filter(item => item.id !== id));
   };
 

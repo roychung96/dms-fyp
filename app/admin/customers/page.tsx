@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
@@ -14,22 +14,21 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
-} from "@/components/ui/dialog"
-
-// Dummy data for demonstration
-const initialCustomers = [
-  { id: 1, name: 'John Doe', phone: '123-456-7890', ic: '800101-01-1234', status: 'Booking' },
-  { id: 2, name: 'Jane Smith', phone: '987-654-3210', ic: '810101-01-4321', status: 'Hot' },
-];
+} from "@/components/ui/dialog";
+import { supabase } from '@/lib/supabaseClient';
 
 const CustomerPage = () => {
-  const [customers, setCustomers] = useState(initialCustomers);
+  const [customers, setCustomers] = useState([]);
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', ic: '', status: 'Booking' });
   const [isManager, setIsManager] = useState(true); // Assume current user is manager for demo purposes
 
   useEffect(() => {
-    // Fetch customers from API when component mounts
-    // For now, we're using dummy data
+    const fetchCustomers = async () => {
+      const { data } = await supabase.from('customers').select('*');
+      setCustomers(data);
+    };
+
+    fetchCustomers();
   }, []);
 
   const handleInputChange = (e) => {
@@ -37,12 +36,16 @@ const CustomerPage = () => {
     setNewCustomer({ ...newCustomer, [name]: value });
   };
 
-  const handleAddCustomer = () => {
-    setCustomers([...customers, { ...newCustomer, id: customers.length + 1 }]);
-    setNewCustomer({ name: '', phone: '', ic: '', status: 'Booking' });
+  const handleAddCustomer = async () => {
+    const { data, error } = await supabase.from('customers').insert([newCustomer]);
+    if (!error) {
+      setCustomers([...customers, data[0]]);
+      setNewCustomer({ name: '', phone: '', ic: '', status: 'Booking' });
+    }
   };
 
-  const handleDeleteCustomer = (id) => {
+  const handleDeleteCustomer = async (id) => {
+    await supabase.from('customers').delete().eq('id', id);
     setCustomers(customers.filter(item => item.id !== id));
   };
 
