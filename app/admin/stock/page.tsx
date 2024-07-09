@@ -17,16 +17,23 @@ import {
 } from "@/components/ui/dialog";
 import Image from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const StockPage = () => {
   const [stock, setStock] = useState([]);
   const [newStock, setNewStock] = useState({ brand: '', model: '', year: '', engine: '', price: '', status: 'incoming', photo: '' });
   const [isManager, setIsManager] = useState(true); // Assume current user is manager for demo purposes
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     const fetchStock = async () => {
-      const { data } = await supabase.from('stock').select('*');
-      setStock(data);
+      const { data, error } = await supabase.from('stock').select('*');
+      if (error) {
+        console.error('Error fetching stock:', error);
+      } else {
+        setStock(data);
+      }
     };
 
     fetchStock();
@@ -38,16 +45,38 @@ const StockPage = () => {
   };
 
   const handleAddStock = async () => {
+    if (!newStock.brand || !newStock.model || !newStock.year || !newStock.engine || !newStock.price || !newStock.status || !newStock.photo) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
     const { data, error } = await supabase.from('stock').insert([newStock]);
-    if (!error) {
-      setStock([...stock, data[0]]);
+    if (error) {
+      console.error('Error adding stock:', error);
+      toast.error(`Error adding stock: ${error.message}`);
+    } else {
+      toast.success('Stock added successfully!');
+      if (data) {
+        setStock([...stock, data[0]]);
+      }
       setNewStock({ brand: '', model: '', year: '', engine: '', price: '', status: 'incoming', photo: '' });
+      setShowModal(false);
+      setTimeout(() => {
+        window.location.reload(); // Force refresh the whole page
+      }, 1000); // Adjust the timeout as needed
     }
   };
 
   const handleDeleteStock = async (id) => {
-    await supabase.from('stock').delete().eq('id', id);
-    setStock(stock.filter(item => item.id !== id));
+    const { error } = await supabase.from('stock').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting stock:', error);
+      toast.error('Error deleting stock');
+    } else {
+      setStock(stock.filter(item => item.id !== id));
+      toast.success('Stock deleted successfully!');
+      window.location.reload(); // Force refresh the whole page after deletion
+    }
   };
 
   const handleEditStock = (id) => {
@@ -59,7 +88,7 @@ const StockPage = () => {
       <header className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-bold">Stock</h1>
         {isManager && (
-          <Dialog>
+          <Dialog open={showModal} onOpenChange={setShowModal}>
             <DialogTrigger asChild>
               <Button className="flex items-center">
                 <FaPlus className="mr-2" />
@@ -202,6 +231,8 @@ const StockPage = () => {
           </table>
         </CardContent>
       </Card>
+
+      <ToastContainer />
     </div>
   );
 };

@@ -17,42 +17,84 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { supabase } from '@/lib/supabaseClient';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  password: string;
+  role: 'manager' | 'salesperson';
+}
+
+interface NewUser {
+  name: string;
+  email: string;
+  password: string;
+  role?: 'manager' | 'salesperson';
+}
 
 const UsersPage = () => {
-  const [users, setUsers] = useState([]);
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'salesperson' });
+  const [users, setUsers] = useState<User[]>([]);
+  const [newUser, setNewUser] = useState<NewUser>({ name: '', email: '', password: '' });
   const [isManager, setIsManager] = useState(true); // Assume current user is manager for demo purposes
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const { data } = await supabase.from('users').select('*');
-      setUsers(data);
+      const { data, error } = await supabase.from('users').select('*');
+      if (error) {
+        console.error('Error fetching users:', error);
+      } else {
+        setUsers(data as User[]);
+      }
     };
 
     fetchUsers();
   }, []);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setNewUser({ ...newUser, [name]: value });
   };
 
   const handleAddUser = async () => {
+    if (!newUser.name || !newUser.email || !newUser.password || !newUser.role) {
+      toast.error('Please fill in all fields, including selecting a role');
+      return;
+    }
+
     const { data, error } = await supabase.from('users').insert([newUser]);
-    if (!error) {
-      setUsers([...users, data[0]]);
-      setNewUser({ name: '', email: '', role: 'salesperson' });
+    if (error) {
+      console.error('Error adding user:', error);
+      toast.error(`Error adding user: ${error.message}`);
+    } else {
+      toast.success('User added successfully!');
+      if (data) {
+        setUsers([...users, data[0] as User]);
+      }      
+      setNewUser({ name: '', email: '', password: '' });
       setShowModal(false);
+      setTimeout(() => {
+        window.location.reload(); // Force refresh the whole page
+      }, 1000); // Adjust the timeout as needed
     }
   };
 
-  const handleDeleteUser = async (id) => {
-    await supabase.from('users').delete().eq('id', id);
-    setUsers(users.filter(user => user.id !== id));
+  const handleDeleteUser = async (id: number) => {
+    const { error } = await supabase.from('users').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Error deleting user');
+    } else {
+      setUsers(users.filter(user => user.id !== id));
+      toast.success('User deleted successfully!');
+      window.location.reload(); // Force refresh the whole page after deletion
+    }
   };
 
-  const handleEditUser = (id) => {
+  const handleEditUser = (id: number) => {
     // Logic to edit user goes here
   };
 
@@ -95,13 +137,24 @@ const UsersPage = () => {
                   />
                 </div>
                 <div>
+                  <Label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</Label>
+                  <Input
+                    type="password"
+                    name="password"
+                    value={newUser.password}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                  />
+                </div>
+                <div>
                   <Label htmlFor="role" className="block text-sm font-medium text-gray-700">Role</Label>
                   <select
                     name="role"
-                    value={newUser.role}
+                    value={newUser.role || ''}
                     onChange={handleInputChange}
                     className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
                   >
+                    <option value="">Select a role</option>
                     <option value="manager">Manager</option>
                     <option value="salesperson">Salesperson</option>
                   </select>
@@ -152,6 +205,8 @@ const UsersPage = () => {
           </table>
         </CardContent>
       </Card>
+
+      <ToastContainer />
     </div>
   );
 };

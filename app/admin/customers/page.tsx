@@ -16,16 +16,23 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { supabase } from '@/lib/supabaseClient';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const CustomerPage = () => {
   const [customers, setCustomers] = useState([]);
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', ic: '', status: 'Booking' });
   const [isManager, setIsManager] = useState(true); // Assume current user is manager for demo purposes
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     const fetchCustomers = async () => {
-      const { data } = await supabase.from('customers').select('*');
-      setCustomers(data);
+      const { data, error } = await supabase.from('customers').select('*');
+      if (error) {
+        console.error('Error fetching customers:', error);
+      } else {
+        setCustomers(data);
+      }
     };
 
     fetchCustomers();
@@ -37,16 +44,38 @@ const CustomerPage = () => {
   };
 
   const handleAddCustomer = async () => {
+    if (!newCustomer.name || !newCustomer.phone || !newCustomer.ic || !newCustomer.status) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
     const { data, error } = await supabase.from('customers').insert([newCustomer]);
-    if (!error) {
-      setCustomers([...customers, data[0]]);
+    if (error) {
+      console.error('Error adding customer:', error);
+      toast.error(`Error adding customer: ${error.message}`);
+    } else {
+      toast.success('Customer added successfully!');
+      if (data) {
+        setCustomers([...customers, data[0]]);
+      }
       setNewCustomer({ name: '', phone: '', ic: '', status: 'Booking' });
+      setShowModal(false);
+      setTimeout(() => {
+        window.location.reload(); // Force refresh the whole page
+      }, 1000); // Adjust the timeout as needed
     }
   };
 
   const handleDeleteCustomer = async (id) => {
-    await supabase.from('customers').delete().eq('id', id);
-    setCustomers(customers.filter(item => item.id !== id));
+    const { error } = await supabase.from('customers').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting customer:', error);
+      toast.error('Error deleting customer');
+    } else {
+      setCustomers(customers.filter(item => item.id !== id));
+      toast.success('Customer deleted successfully!');
+      window.location.reload(); // Force refresh the whole page after deletion
+    }
   };
 
   const handleEditCustomer = (id) => {
@@ -58,7 +87,7 @@ const CustomerPage = () => {
       <header className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-bold">Customers</h1>
         {isManager && (
-          <Dialog>
+          <Dialog open={showModal} onOpenChange={setShowModal}>
             <DialogTrigger asChild>
               <Button className="flex items-center">
                 <FaPlus className="mr-2" />
@@ -162,6 +191,8 @@ const CustomerPage = () => {
           </table>
         </CardContent>
       </Card>
+
+      <ToastContainer />
     </div>
   );
 };
