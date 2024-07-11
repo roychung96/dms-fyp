@@ -7,6 +7,9 @@ const ContactForm = () => {
     message: ''
   });
 
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
       ...formData,
@@ -14,14 +17,44 @@ const ContactForm = () => {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission logic here (e.g., send data to an API)
-    console.log(formData);
+    setError('');
+    setSubmitted(false);
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (response.ok) {
+        setSubmitted(true);
+        setFormData({ name: '', email: '', message: '' });
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Something went wrong');
+      }
+    } catch (error) {
+      setError('Something went wrong');
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 px-4 py-6 md:px-0">
+      {submitted && (
+        <div className="p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg" role="alert">
+          Your message has been sent successfully!
+        </div>
+      )}
+      {error && (
+        <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg" role="alert">
+          {error}
+        </div>
+      )}
       <div>
         <label htmlFor="name" className="block text-sm font-medium text-left">
           Name

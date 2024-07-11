@@ -1,56 +1,56 @@
-// pages/api/visitors.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabaseClient';
 
-// Create the Visitors table if it doesn't exist
-async function createVisitorsTable() {
-  await sql`CREATE TABLE IF NOT EXISTS Visitors (
-    id serial PRIMARY KEY,
-    ip_address varchar(255) UNIQUE
-  );`;
-}
-
-// Function to count visitors and return the count
-async function countVisitors(request: Request): Promise<number> {
-  // Get the visitor's IP address from the request headers
-  const visitorIpAddress = request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for') || request.headers.get('cf-connecting-ip');
-
+export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    // Check if the visitor's IP address already exists in the Visitors table
-    const existingVisitor = await sql`SELECT * FROM Visitors WHERE ip_address = ${visitorIpAddress}`;
+    const ip = req.headers.get('x-real-ip') || req.headers.get('x-forwarded-for') || req.ip;
 
-    if (existingVisitor.rowCount > 0) {
-      // If the IP address exists, the visitor has already been counted
-      return (await sql`SELECT COUNT(*) FROM Visitors`).rows[0].count;
-    } else {
-      // If the IP address doesn't exist, insert it into the Visitors table
-      await sql`INSERT INTO Visitors (ip_address) VALUES (${visitorIpAddress})`;
-      
-      // Get the total number of visitors in the Visitors table
-      return (await sql`SELECT COUNT(*) FROM Visitors`).rows[0].count;
+    if (!ip) {
+      return new NextResponse('IP address not found', { status: 400 });
     }
+
+    // Check if the IP address already exists in the visitors table
+    const { data: existingVisitor, error: checkError } = await supabase
+      .from('visitors')
+      .select('id')
+      .eq('ip_address', ip);
+
+    if (checkError) {
+      throw new Error('Error checking visitor IP: ' + checkError.message);
+    }
+
+    if (existingVisitor && existingVisitor.length > 0) {
+      return new NextResponse('Visitor already counted', { status: 200 });
+    }
+
+    // Insert new visitor IP address
+    const { error: insertError } = await supabase
+      .from('visitors')
+      .insert([{ ip_address: ip }]);
+
+    if (insertError) {
+      throw new Error('Error inserting visitor IP: ' + insertError.message);
+    }
+
+    return new NextResponse('Visitor IP saved', { status: 201 });
   } catch (error) {
-    throw error;
+    return new NextResponse('Error processing request: ' + error.message, { status: 500 });
   }
 }
 
-// POST route to count visitors and send only the visitor count
-export async function POST(request: Request) {
+export async function GET(): Promise<NextResponse> {
   try {
-    await createVisitorsTable();
-    const visitorCount = await countVisitors(request);
-    return NextResponse.json({ count: visitorCount }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ error }, { status: 500 });
-  }
-}
+    // Get the total number of visitors
+    const { data: visitorCount, error: countError } = await supabase
+      .from('visitors')
+      .select('id', { count: 'exact' });
 
-// GET route to retrieve visitor count
-export async function GET(request: Request) {
-  try {
-    await createVisitorsTable();
-    const visitorCount = await countVisitors(request);
-    return NextResponse.json({ message: 'Visitor count retrieved successfully.', count: visitorCount }, { status: 200 });
+    if (countError) {
+      throw new Error('Error retrieving visitor count: ' + countError.message);
+    }
+
+    return NextResponse.json({ count: visitorCount.length }, { status: 200 });
   } catch (error) {
-    return NextResponse.json({ error }, { status: 500 });
+    return new NextResponse('Error processing request: ' + error.message, { status: 500 });
   }
 }

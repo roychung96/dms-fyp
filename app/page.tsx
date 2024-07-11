@@ -1,17 +1,43 @@
-"use client"
-import React from 'react';
+"use client";
+import React, { useEffect, useState } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Link from 'next/link';
 import ContactForm from './components/ContactForm';
+import Image from 'next/image';
+
+interface CarModel {
+  id: number;
+  brand: string;
+  model: string;
+  year: number;
+  engine: string;
+  price: number;
+  status: string;
+  photo: string;
+}
 
 const Home = () => {
+  const [cars, setCars] = useState<CarModel[]>([]);
+
+  useEffect(() => {
+    const fetchCars = async () => {
+      const response = await fetch('/api/stock');
+      if (response.ok) {
+        const data = await response.json();
+        const onSaleCars = data.filter((car: CarModel) => car.status === 'on sales');
+        setCars(onSaleCars);
+      }
+    };
+    fetchCars();
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
       <main className="flex-1">
-        <section className="w-full pt-12 md:pt-24 lg:pt-32">
-          <div className="container px-4 md:px-6">
+        <section className="w-full pt-12 md:pt-24 lg:pt-32 pb-12">
+          <div className="container mx-auto px-4 md:px-6">
             <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
               <div className="flex flex-col justify-center space-y-4">
                 <div className="space-y-2">
@@ -40,18 +66,18 @@ const Home = () => {
                   </Link>
                 </div>
               </div>
-              <img
-                src="/placeholder.svg"
-                width="550"
-                height="550"
+              <Image
+                src="/future.jpg"
+                width="600"
+                height="400"
                 alt="Hero Car"
-                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover object-center sm:w-full lg:order-last lg:aspect-square"
+                className="mx-auto "
               />
             </div>
           </div>
         </section>
         <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
-          <div className="container px-4 md:px-6">
+          <div className="container mx-auto px-4 md:px-6">
             <div className="grid gap-6 lg:grid-cols-2 lg:gap-12">
               <div className="flex flex-col justify-center space-y-4">
                 <div className="space-y-2">
@@ -63,8 +89,8 @@ const Home = () => {
                   </p>
                 </div>
               </div>
-              <img
-                src="/placeholder.svg"
+              <Image
+                src="/about-banner.jpg"
                 width="550"
                 height="310"
                 alt="About CarNation"
@@ -74,70 +100,42 @@ const Home = () => {
           </div>
         </section>
         <section className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container px-4 md:px-6">
+          <div className="container mx-auto px-4 md:px-6">
             <div className="space-y-4 text-center">
               <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Our Car Models</h2>
-                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl ">Our Car Models</h2>
+                <p className=" text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed text-center">
                   Explore our cutting-edge car models, each designed to provide an unparalleled driving experience.
                 </p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-              <div className="bg-card rounded-lg overflow-hidden shadow-md">
-                <img
-                  src="/placeholder.svg"
-                  width="400"
-                  height="300"
-                  alt="Model 1"
-                  className="w-full h-48 object-cover"
-                />
-                <div className="p-4">
-                  <h3 className="text-xl font-bold">Model 1</h3>
-                  <p className="text-muted-foreground mt-2">
-                    Experience the ultimate in performance and style with our flagship Model 1 car.
-                  </p>
+              {cars.map((car) => (
+                <div key={car.id} className="bg-card rounded-lg overflow-hidden shadow-md">
+                  <Image
+                    src={car.photo}
+                    width="400"
+                    height="300"
+                    alt={car.model}
+                    className="w-full h-48 object-cover"
+                  />
+                  <div className="p-4">
+                    <h3 className="text-xl font-bold">{car.brand} {car.model}</h3>
+                    <p className="text-muted-foreground mt-2">
+                      {car.engine} - RM {car.price}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="bg-card rounded-lg overflow-hidden shadow-md">
-                <img
-                  src="/placeholder.svg"
-                  width="400"
-                  height="300"
-                  alt="Model 2"
-                  className="w-full h-48 object-cover"
-                />
-                <div className="p-4">
-                  <h3 className="text-xl font-bold">Model 2</h3>
-                  <p className="text-muted-foreground mt-2">
-                    Discover the perfect balance of power and efficiency with our Model 2 car.
-                  </p>
-                </div>
-              </div>
-              <div className="bg-card rounded-lg overflow-hidden shadow-md">
-                <img
-                  src="/placeholder.svg"
-                  width="400"
-                  height="300"
-                  alt="Model 3"
-                  className="w-full h-48 object-cover"
-                />
-                <div className="p-4">
-                  <h3 className="text-xl font-bold">Model 3</h3>
-                  <p className="text-muted-foreground mt-2">
-                    Elevate your driving experience with the cutting-edge technology of our Model 3 car.
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </section>
         <section id="contact" className="w-full py-12 md:py-24 lg:py-32 bg-gray-100">
-          <div className="container px-4 md:px-6">
+          <div className="container mx-auto px-4 md:px-6">
             <div className="space-y-4 text-center">
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Contact Us</h2>
-                <p className="max-w-[600px] text-muted-foreground md:text-xl/relaxed">
+                <p className="text-muted-foreground md:text-xl/relaxed">
                   Have questions or need more information? Reach out to us!
                 </p>
               </div>

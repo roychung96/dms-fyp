@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
@@ -18,13 +18,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const logVisit = async () => {
-      const response = await fetch('/api/visitors', { method: 'POST' });
-      if (response.ok) {
-        const data = await response.json();
-        setVisitorCount(data.count);
-      } else {
-        console.error('Error logging visit');
-      }
+      await fetch('/api/visitors', { method: 'POST' });
     };
 
     const fetchVisitorCount = async () => {
@@ -64,38 +58,39 @@ const AdminDashboard = () => {
         setProductCount(data.length);
       }
     };
+
     const fetchChartData = async () => {
-        const { data: salesData, error: salesError } = await supabase.from('sales').select('*');
-        if (salesError) {
-          console.error('Error fetching sales data:', salesError);
-          return;
-        }
-        const { data: stockData, error: stockError } = await supabase.from('stock').select('*');
-        if (stockError) {
-          console.error('Error fetching stock data:', stockError);
-          return;
-        }
-  
-        const brandSales = salesData.reduce((acc: any, sale: any) => {
-          const stockItem = stockData.find((item: any) => item.id === sale.product_id);
-          if (stockItem) {
-            const brand = stockItem.brand;
-            if (!acc[brand]) {
-              acc[brand] = 0;
-            }
-            acc[brand] += sale.amount;
+      const { data: salesData, error: salesError } = await supabase.from('sales').select('*');
+      if (salesError) {
+        console.error('Error fetching sales data:', salesError);
+        return;
+      }
+      const { data: stockData, error: stockError } = await supabase.from('stock').select('*');
+      if (stockError) {
+        console.error('Error fetching stock data:', stockError);
+        return;
+      }
+
+      const brandSales = salesData.reduce((acc: any, sale: any) => {
+        const stockItem = stockData.find((item: any) => item.id === sale.product_id);
+        if (stockItem) {
+          const brand = stockItem.brand;
+          if (!acc[brand]) {
+            acc[brand] = 0;
           }
-          return acc;
-        }, {});
-  
-        const chartData = Object.keys(brandSales).map((brand) => ({
-          brand,
-          sales: brandSales[brand],
-        }));
-  
-        setChartData(chartData);
-      };
-  
+          acc[brand] += sale.amount;
+        }
+        return acc;
+      }, {});
+
+      const chartData = Object.keys(brandSales).map((brand) => ({
+        brand,
+        sales: brandSales[brand],
+      }));
+
+      setChartData(chartData);
+    };
+
     const fetchRecentUsers = async () => {
       const { data, error } = await supabase
         .from('sales')
