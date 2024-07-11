@@ -14,7 +14,7 @@ const AdminDashboard = () => {
   const [soldCount, setSoldCount] = useState(0);
   const [productCount, setProductCount] = useState(0);
   const [chartData, setChartData] = useState<{ brand: string, sales: number }[]>([]);
-  const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [recentUsers, setRecentUsers] = useState<any[]>([]);
 
   useEffect(() => {
     const logVisit = async () => {
@@ -64,25 +64,53 @@ const AdminDashboard = () => {
         setProductCount(data.length);
       }
     };
-
     const fetchChartData = async () => {
-      const { data, error } = await supabase.from('sales').select('brand, count').group('brand');
-      if (error) {
-        console.error('Error fetching chart data:', error);
-      } else {
-        setChartData(data.map((item: any) => ({ brand: item.brand, sales: item.count })));
-      }
-    };
+        const { data: salesData, error: salesError } = await supabase.from('sales').select('*');
+        if (salesError) {
+          console.error('Error fetching sales data:', salesError);
+          return;
+        }
+        const { data: stockData, error: stockError } = await supabase.from('stock').select('*');
+        if (stockError) {
+          console.error('Error fetching stock data:', stockError);
+          return;
+        }
+  
+        const brandSales = salesData.reduce((acc: any, sale: any) => {
+          const stockItem = stockData.find((item: any) => item.id === sale.product_id);
+          if (stockItem) {
+            const brand = stockItem.brand;
+            if (!acc[brand]) {
+              acc[brand] = 0;
+            }
+            acc[brand] += sale.amount;
+          }
+          return acc;
+        }, {});
+  
+        const chartData = Object.keys(brandSales).map((brand) => ({
+          brand,
+          sales: brandSales[brand],
+        }));
+  
+        setChartData(chartData);
+      };
+  
+    const fetchRecentUsers = async () => {
+      const { data, error } = await supabase
+        .from('sales')
+        .select('*, stock(price), users(name, email, profile_picture)')
+        .order('created_at', { ascending: false })
+        .limit(5);
 
-    const fetchRecentSales = async () => {
-      const { data, error } = await supabase.from('sales').select('*, stock(price)').order('created_at', { ascending: false }).limit(5);
       if (error) {
-        console.error('Error fetching recent sales:', error);
+        console.error('Error fetching recent users:', error);
       } else {
-        setRecentSales(data.map((sale: any) => ({
+        const recentSalesWithUsers = data.map((sale: any) => ({
           ...sale,
-          amount: sale.amount * sale.stock.price,
-        })));
+          totalAmount: sale.amount * sale.stock.price,
+        }));
+        setRecentUsers(recentSalesWithUsers);
       }
     };
 
@@ -92,7 +120,7 @@ const AdminDashboard = () => {
     fetchSoldCount();
     fetchProductCount();
     fetchChartData();
-    fetchRecentSales();
+    fetchRecentUsers();
   }, []);
 
   return (
@@ -154,22 +182,22 @@ const AdminDashboard = () => {
         </Card>
 
         <Card>
-          <CardHeader>Recent Sales</CardHeader>
+          <CardHeader>Recent Users</CardHeader>
           <CardContent>
             <ul>
-              {recentSales.map((sale: any, index) => (
+              {recentUsers.map((sale: any, index) => (
                 <li key={index} className="flex justify-between items-center mb-4">
                   <div className="flex items-center space-x-3">
                     <Avatar>
-                      <AvatarImage src={sale.customer_avatar || "https://github.com/shadcn.png"} />
+                      <AvatarImage src={sale.users.profile_picture || "https://github.com/shadcn.png"} />
                       <AvatarFallback>CN</AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">{sale.customer_name}</p>
-                      <p className="text-sm text-gray-500">{sale.customer_email}</p>
+                      <p className="font-medium">{sale.users.name}</p>
+                      <p className="text-sm text-gray-500">{sale.users.email}</p>
                     </div>
                   </div>
-                  <span className="text-green-500">+RM {sale.amount}</span>
+                  <span className="text-green-500">+RM {sale.totalAmount}</span>
                 </li>
               ))}
             </ul>

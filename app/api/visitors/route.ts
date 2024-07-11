@@ -1,77 +1,56 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { supabase } from '@/lib/supabaseClient';
+// pages/api/visitors.ts
+import { NextResponse } from 'next/server';
 
-const getVisitorIP = (req: NextApiRequest) => {
-  const ip = req.headers['x-real-ip'] ||
-    req.headers['x-forwarded-for'] ||
-    req.socket.remoteAddress;
+// Create the Visitors table if it doesn't exist
+async function createVisitorsTable() {
+  await sql`CREATE TABLE IF NOT EXISTS Visitors (
+    id serial PRIMARY KEY,
+    ip_address varchar(255) UNIQUE
+  );`;
+}
 
-  return Array.isArray(ip) ? ip[0] : ip;
-};
+// Function to count visitors and return the count
+async function countVisitors(request: Request): Promise<number> {
+  // Get the visitor's IP address from the request headers
+  const visitorIpAddress = request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for') || request.headers.get('cf-connecting-ip');
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === 'POST') {
-    const visitorIpAddress = getVisitorIP(req);
+  try {
+    // Check if the visitor's IP address already exists in the Visitors table
+    const existingVisitor = await sql`SELECT * FROM Visitors WHERE ip_address = ${visitorIpAddress}`;
 
-    try {
-      // Check if the visitor's IP address already exists in the Visitors table
-      const { data: existingVisitor, error: selectError } = await supabase
-        .from('visitors')
-        .select('id')
-        .eq('ip_address', visitorIpAddress)
-        .single();
-
-      if (selectError && selectError.code !== 'PGRST116') {
-        console.error('Error checking existing visitor:', selectError);
-        return res.status(500).json({ error: selectError.message });
-      }
-
-      if (!existingVisitor) {
-        // If the IP address doesn't exist, insert it into the Visitors table
-        const { error: insertError } = await supabase
-          .from('visitors')
-          .insert([{ ip_address: visitorIpAddress, visit_time: new Date() }]);
-
-        if (insertError) {
-          console.error('Error inserting visitor:', insertError);
-          return res.status(500).json({ error: insertError.message });
-        }
-      }
-
+    if (existingVisitor.rowCount > 0) {
+      // If the IP address exists, the visitor has already been counted
+      return (await sql`SELECT COUNT(*) FROM Visitors`).rows[0].count;
+    } else {
+      // If the IP address doesn't exist, insert it into the Visitors table
+      await sql`INSERT INTO Visitors (ip_address) VALUES (${visitorIpAddress})`;
+      
       // Get the total number of visitors in the Visitors table
-      const { count, error: countError } = await supabase
-        .from('visitors')
-        .select('*', { count: 'exact' });
-
-      if (countError) {
-        console.error('Error getting visitor count:', countError);
-        return res.status(500).json({ error: countError.message });
-      }
-
-      res.status(200).json({ count });
-    } catch (error) {
-      console.error('Error logging visit:', error);
-      res.status(500).json({ error: error.message });
+      return (await sql`SELECT COUNT(*) FROM Visitors`).rows[0].count;
     }
-  } else if (req.method === 'GET') {
-    try {
-      // Get the total number of visitors in the Visitors table
-      const { count, error: countError } = await supabase
-        .from('visitors')
-        .select('*', { count: 'exact' });
+  } catch (error) {
+    throw error;
+  }
+}
 
-      if (countError) {
-        console.error('Error fetching visitor count:', countError);
-        return res.status(500).json({ error: countError.message });
-      }
+// POST route to count visitors and send only the visitor count
+export async function POST(request: Request) {
+  try {
+    await createVisitorsTable();
+    const visitorCount = await countVisitors(request);
+    return NextResponse.json({ count: visitorCount }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json({ error }, { status: 500 });
+  }
+}
 
-      res.status(200).json({ count });
-    } catch (error) {
-      console.error('Error fetching visitor count:', error);
-      res.status(500).json({ error: error.message });
-    }
-  } else {
-    res.setHeader('Allow', ['POST', 'GET']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+// GET route to retrieve visitor count
+export async function GET(request: Request) {
+  try {
+    await createVisitorsTable();
+    const visitorCount = await countVisitors(request);
+    return NextResponse.json({ message: 'Visitor count retrieved successfully.', count: visitorCount }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json({ error }, { status: 500 });
   }
 }

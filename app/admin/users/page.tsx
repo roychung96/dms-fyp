@@ -23,7 +23,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 interface User {
   id?: number;
-  name: string;
+  name?: string;
   email: string;
   password: string;
   role: 'manager' | 'salesperson';
@@ -37,21 +37,22 @@ const UsersPage: React.FC = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isManager, setIsManager] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const { getRootProps, getInputProps } = useDropzone({
-    accept: 'image/*',
+    accept: ['image/*'],
     onDrop: acceptedFiles => {
       const file = acceptedFiles[0];
       const fileName = `${Date.now()}-${file.name}`;
       const reader = new FileReader();
-
+  
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
       };
-
+  
       if (file) {
         reader.readAsDataURL(file);
-        handleProfilePictureChange(file, fileName);
+        setImageFile(file);
       }
     }
   });
@@ -64,13 +65,9 @@ const UsersPage: React.FC = () => {
     if (error) {
       console.error('Error uploading profile picture:', error);
       toast.error(`Error uploading profile picture: ${error.message}`);
+      return null;
     } else {
-      const imageUrl = supabase.storage.from('profile_pictures').getPublicUrl(fileName).publicUrl;
-      if (editingUser) {
-        setEditingUser({ ...editingUser, profile_picture: imageUrl });
-      } else {
-        setNewUser({ ...newUser, profile_picture: imageUrl });
-      }
+      return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/profile_pictures/${fileName}`;
     }
   };
 
@@ -97,12 +94,18 @@ const UsersPage: React.FC = () => {
   };
 
   const handleAddUser = async () => {
-    if (!newUser.name || !newUser.email || !newUser.password || !newUser.role || !newUser.profile_picture) {
+    if (!newUser.name || !newUser.email || !newUser.password || !newUser.role || !imageFile) {
       toast.error('Please fill in all fields, including selecting a role and uploading a profile picture');
       return;
     }
 
-    const { data, error } = await supabase.from('users').insert([newUser]);
+    const fileName = `${Date.now()}-${imageFile.name}`;
+    const imageUrl = await handleProfilePictureChange(imageFile, fileName);
+    if (!imageUrl) return;
+
+    const userWithImage = { ...newUser, profile_picture: imageUrl };
+
+    const { data, error } = await supabase.from('users').insert([userWithImage]);
     if (error) {
       console.error('Error adding user:', error);
       toast.error(`Error adding user: ${error.message}`);
@@ -120,13 +123,20 @@ const UsersPage: React.FC = () => {
   };
 
   const handleUpdateUser = async () => {
-    if (!editingUser || !editingUser.name || !editingUser.email || !editingUser.password || !editingUser.role || !editingUser.profile_picture) {
+    if (!editingUser || !editingUser.name || !editingUser.email || !editingUser.password || !editingUser.role || (!editingUser.profile_picture && !imageFile)) {
       toast.error('Please fill in all fields, including selecting a role and uploading a profile picture');
       return;
     }
 
-    const { id, name, email, password, role, profile_picture } = editingUser;
-    const { data, error } = await supabase.from('users').update({ name, email, password, role, profile_picture }).eq('id', id);
+    let imageUrl = editingUser.profile_picture;
+    if (imageFile) {
+      const fileName = `${Date.now()}-${imageFile.name}`;
+      imageUrl = await handleProfilePictureChange(imageFile, fileName);
+      if (!imageUrl) return;
+    }
+
+    const { id, name, email, password, role } = editingUser;
+    const { data, error } = await supabase.from('users').update({ name, email, password, role, profile_picture: imageUrl }).eq('id', id);
     if (error) {
       console.error('Error updating user:', error);
       toast.error(`Error updating user: ${error.message}`);
@@ -161,6 +171,7 @@ const UsersPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted'); // Add this line for debugging
     if (editingUser) {
       await handleUpdateUser();
     } else {
