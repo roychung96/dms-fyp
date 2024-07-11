@@ -19,10 +19,19 @@ import { supabase } from '@/lib/supabaseClient';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-const CustomerPage = () => {
-  const [customers, setCustomers] = useState([]);
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', ic: '', status: 'Booking' });
-  const [isManager, setIsManager] = useState(true); // Assume current user is manager for demo purposes
+interface Customer {
+  id?: number; // Optional, as it may not be present before saving to the database
+  name: string;
+  phone: string;
+  ic: string;
+  status: string;
+}
+
+const CustomerPage: React.FC = () => {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [newCustomer, setNewCustomer] = useState<Customer>({ name: '', phone: '', ic: '', status: 'Booking' });
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [isManager, setIsManager] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
@@ -38,9 +47,13 @@ const CustomerPage = () => {
     fetchCustomers();
   }, []);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setNewCustomer({ ...newCustomer, [name]: value });
+    if (editingCustomer) {
+      setEditingCustomer({ ...editingCustomer, [name]: value });
+    } else {
+      setNewCustomer({ ...newCustomer, [name]: value });
+    }
   };
 
   const handleAddCustomer = async () => {
@@ -61,12 +74,35 @@ const CustomerPage = () => {
       setNewCustomer({ name: '', phone: '', ic: '', status: 'Booking' });
       setShowModal(false);
       setTimeout(() => {
-        window.location.reload(); // Force refresh the whole page
-      }, 1000); // Adjust the timeout as needed
+        window.location.reload();
+      }, 1000);
     }
   };
 
-  const handleDeleteCustomer = async (id) => {
+  const handleUpdateCustomer = async () => {
+    if (!editingCustomer || !editingCustomer.name || !editingCustomer.phone || !editingCustomer.ic || !editingCustomer.status) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    const { id, name, phone, ic, status } = editingCustomer;
+    const { data, error } = await supabase.from('customers').update({ name, phone, ic, status }).eq('id', id);
+    if (error) {
+      console.error('Error updating customer:', error);
+      toast.error(`Error updating customer: ${error.message}`);
+    } else {
+      toast.success('Customer updated successfully!');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      setCustomers(customers.map(c => (c.id === id ? (data ? data[0] : c) : c)));
+      setEditingCustomer(null);
+      setShowModal(false);
+     
+    }
+  };
+
+  const handleDeleteCustomer = async (id: number) => {
     const { error } = await supabase.from('customers').delete().eq('id', id);
     if (error) {
       console.error('Error deleting customer:', error);
@@ -74,84 +110,26 @@ const CustomerPage = () => {
     } else {
       setCustomers(customers.filter(item => item.id !== id));
       toast.success('Customer deleted successfully!');
-      window.location.reload(); // Force refresh the whole page after deletion
+      window.location.reload();
     }
   };
 
-  const handleEditCustomer = (id) => {
-    // Logic to edit customer goes here
+  const handleEditCustomer = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setShowModal(true);
   };
+
+  const handleSubmit = editingCustomer ? handleUpdateCustomer : handleAddCustomer;
 
   return (
     <div className="p-4 space-y-4">
       <header className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-bold">Customers</h1>
         {isManager && (
-          <Dialog open={showModal} onOpenChange={setShowModal}>
-            <DialogTrigger asChild>
-              <Button className="flex items-center">
-                <FaPlus className="mr-2" />
-                Add Customer
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Add New Customer</DialogTitle>
-                <DialogDescription>Fill in the details below to add new customer.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name</label>
-                  <Input
-                    type="text"
-                    name="name"
-                    value={newCustomer.name}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Phone</label>
-                  <Input
-                    type="text"
-                    name="phone"
-                    value={newCustomer.phone}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="ic" className="block text-sm font-medium text-gray-700">IC</label>
-                  <Input
-                    type="text"
-                    name="ic"
-                    value={newCustomer.ic}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
-                  <select
-                    name="status"
-                    value={newCustomer.status}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                  >
-                    <option value="Booking">Booking</option>
-                    <option value="Hot">Hot</option>
-                    <option value="Cold">Cold</option>
-                  </select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleAddCustomer}>Submit</Button>
-                <DialogClose asChild>
-                  <Button variant="secondary">Close</Button>
-                </DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button className="flex items-center" onClick={() => { setEditingCustomer(null); setShowModal(true); }}>
+            <FaPlus className="mr-2" />
+            Add Customer
+          </Button>
         )}
       </header>
 
@@ -177,10 +155,10 @@ const CustomerPage = () => {
                   <td className="px-6 py-4 whitespace-nowrap">{item.status}</td>
                   {isManager && (
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Button variant="outline" onClick={() => handleEditCustomer(item.id)} className="mr-2">
+                      <Button variant="outline" onClick={() => handleEditCustomer(item)} className="mr-2">
                         <FaEdit />
                       </Button>
-                      <Button variant="outline" onClick={() => handleDeleteCustomer(item.id)}>
+                      <Button variant="outline" onClick={() => handleDeleteCustomer(item.id ?? 0)}>
                         <FaTrash />
                       </Button>
                     </td>
@@ -191,6 +169,66 @@ const CustomerPage = () => {
           </table>
         </CardContent>
       </Card>
+
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
+            <DialogDescription>Fill in the details below to {editingCustomer ? 'update' : 'add new'} customer.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name</label>
+              <Input
+                type="text"
+                name="name"
+                value={editingCustomer ? editingCustomer.name : newCustomer.name}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Phone</label>
+              <Input
+                type="text"
+                name="phone"
+                value={editingCustomer ? editingCustomer.phone : newCustomer.phone}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="ic" className="block text-sm font-medium text-gray-700">IC</label>
+              <Input
+                type="text"
+                name="ic"
+                value={editingCustomer ? editingCustomer.ic : newCustomer.ic}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+              <select
+                name="status"
+                value={editingCustomer ? editingCustomer.status : newCustomer.status}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+              >
+                <option value="Booking">Booking</option>
+                <option value="Hot">Hot</option>
+                <option value="Cold">Cold</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSubmit}>Submit</Button>
+            <DialogClose asChild>
+              <Button variant="secondary">Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ToastContainer />
     </div>

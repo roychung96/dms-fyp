@@ -20,10 +20,22 @@ import { supabase } from '@/lib/supabaseClient';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-const StockPage = () => {
-  const [stock, setStock] = useState([]);
-  const [newStock, setNewStock] = useState({ brand: '', model: '', year: '', engine: '', price: '', status: 'incoming', photo: '' });
-  const [isManager, setIsManager] = useState(true); // Assume current user is manager for demo purposes
+interface StockItem {
+  id?: number;
+  brand: string;
+  model: string;
+  year: string;
+  engine: string;
+  price: string;
+  status: string;
+  photo: string;
+}
+
+const StockPage: React.FC = () => {
+  const [stock, setStock] = useState<StockItem[]>([]);
+  const [newStock, setNewStock] = useState<StockItem>({ brand: '', model: '', year: '', engine: '', price: '', status: 'incoming', photo: '' });
+  const [editingStock, setEditingStock] = useState<StockItem | null>(null);
+  const [isManager, setIsManager] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
@@ -39,9 +51,35 @@ const StockPage = () => {
     fetchStock();
   }, []);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setNewStock({ ...newStock, [name]: value });
+    if (editingStock) {
+      setEditingStock({ ...editingStock, [name]: value });
+    } else {
+      setNewStock({ ...newStock, [name]: value });
+    }
+  };
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const fileName = `${Date.now()}-${file.name}`;
+      const { data, error } = await supabase.storage
+        .from('car_photos')
+        .upload(fileName, file);
+
+      if (error) {
+        console.error('Error uploading photo:', error);
+        toast.error(`Error uploading photo: ${error.message}`);
+      } else {
+        const photoUrl = supabase.storage.from('car_photos').getPublicUrl(fileName).publicURL;
+        if (editingStock) {
+          setEditingStock({ ...editingStock, photo: photoUrl });
+        } else {
+          setNewStock({ ...newStock, photo: photoUrl });
+        }
+      }
+    }
   };
 
   const handleAddStock = async () => {
@@ -62,12 +100,34 @@ const StockPage = () => {
       setNewStock({ brand: '', model: '', year: '', engine: '', price: '', status: 'incoming', photo: '' });
       setShowModal(false);
       setTimeout(() => {
-        window.location.reload(); // Force refresh the whole page
-      }, 1000); // Adjust the timeout as needed
+        window.location.reload();
+      }, 1000);
     }
   };
 
-  const handleDeleteStock = async (id) => {
+  const handleUpdateStock = async () => {
+    if (!editingStock || !editingStock.brand || !editingStock.model || !editingStock.year || !editingStock.engine || !editingStock.price || !editingStock.status || !editingStock.photo) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    const { id, brand, model, year, engine, price, status, photo } = editingStock;
+    const { data, error } = await supabase.from('stock').update({ brand, model, year, engine, price, status, photo }).eq('id', id);
+    if (error) {
+      console.error('Error updating stock:', error);
+      toast.error(`Error updating stock: ${error.message}`);
+    } else {
+      toast.success('Stock updated successfully!');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      setStock(stock.map(s => (s.id === id ? (data ? data[0] : s) : s)));
+      setEditingStock(null);
+      setShowModal(false);
+    }
+  };
+
+  const handleDeleteStock = async (id: number) => {
     const { error } = await supabase.from('stock').delete().eq('id', id);
     if (error) {
       console.error('Error deleting stock:', error);
@@ -75,115 +135,26 @@ const StockPage = () => {
     } else {
       setStock(stock.filter(item => item.id !== id));
       toast.success('Stock deleted successfully!');
-      window.location.reload(); // Force refresh the whole page after deletion
+      window.location.reload();
     }
   };
 
-  const handleEditStock = (id) => {
-    // Logic to edit stock goes here
+  const handleEditStock = (stock: StockItem) => {
+    setEditingStock(stock);
+    setShowModal(true);
   };
+
+  const handleSubmit = editingStock ? handleUpdateStock : handleAddStock;
 
   return (
     <div className="p-4 space-y-4">
       <header className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-bold">Stock</h1>
         {isManager && (
-          <Dialog open={showModal} onOpenChange={setShowModal}>
-            <DialogTrigger asChild>
-              <Button className="flex items-center">
-                <FaPlus className="mr-2" />
-                Add Stock
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Add New Stock</DialogTitle>
-                <DialogDescription>Fill in the details below to add new stock.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="brand" className="block text-sm font-medium text-gray-700">Brand</label>
-                  <Input
-                    type="text"
-                    name="brand"
-                    value={newStock.brand}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="model" className="block text-sm font-medium text-gray-700">Model</label>
-                  <Input
-                    type="text"
-                    name="model"
-                    value={newStock.model}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="year" className="block text-sm font-medium text-gray-700">Year</label>
-                  <Input
-                    type="number"
-                    name="year"
-                    value={newStock.year}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="engine" className="block text-sm font-medium text-gray-700">Engine</label>
-                  <Input
-                    type="text"
-                    name="engine"
-                    value={newStock.engine}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="price" className="block text-sm font-medium text-gray-700">Price</label>
-                  <Input
-                    type="number"
-                    name="price"
-                    value={newStock.price}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
-                  <select
-                    name="status"
-                    value={newStock.status}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                  >
-                    <option value="incoming">Incoming</option>
-                    <option value="on sales">On Sales</option>
-                    <option value="booking">Booking</option>
-                    <option value="sold">Sold</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="photo" className="block text-sm font-medium text-gray-700">Photo URL</label>
-                  <Input
-                    type="text"
-                    name="photo"
-                    value={newStock.photo}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleAddStock}>Submit</Button>
-                <DialogClose asChild>
-                  <Button variant="secondary">Close</Button>
-                </DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button className="flex items-center" onClick={() => { setEditingStock(null); setShowModal(true); }}>
+            <FaPlus className="mr-2" />
+            Add Stock
+          </Button>
         )}
       </header>
 
@@ -217,10 +188,10 @@ const StockPage = () => {
                   </td>
                   {isManager && (
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Button variant="outline" onClick={() => handleEditStock(item.id)} className="mr-2">
+                      <Button variant="outline" onClick={() => handleEditStock(item)} className="mr-2">
                         <FaEdit />
                       </Button>
-                      <Button variant="outline" onClick={() => handleDeleteStock(item.id)}>
+                      <Button variant="outline" onClick={() => handleDeleteStock(item.id ?? 0)}>
                         <FaTrash />
                       </Button>
                     </td>
@@ -231,6 +202,96 @@ const StockPage = () => {
           </table>
         </CardContent>
       </Card>
+
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingStock ? 'Edit Stock' : 'Add New Stock'}</DialogTitle>
+            <DialogDescription>Fill in the details below to {editingStock ? 'update' : 'add new'} stock.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="brand" className="block text-sm font-medium text-gray-700">Brand</label>
+              <Input
+                type="text"
+                name="brand"
+                value={editingStock ? editingStock.brand : newStock.brand}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="model" className="block text-sm font-medium text-gray-700">Model</label>
+              <Input
+                type="text"
+                name="model"
+                value={editingStock ? editingStock.model : newStock.model}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="year" className="block text-sm font-medium text-gray-700">Year</label>
+              <Input
+                type="number"
+                name="year"
+                value={editingStock ? editingStock.year : newStock.year}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="engine" className="block text-sm font-medium text-gray-700">Engine</label>
+              <Input
+                type="text"
+                name="engine"
+                value={editingStock ? editingStock.engine : newStock.engine}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="price" className="block text-sm font-medium text-gray-700">Price</label>
+              <Input
+                type="number"
+                name="price"
+                value={editingStock ? editingStock.price : newStock.price}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+              <select
+                name="status"
+                value={editingStock ? editingStock.status : newStock.status}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+              >
+                <option value="incoming">Incoming</option>
+                <option value="on sales">On Sales</option>
+                <option value="booking">Booking</option>
+                <option value="sold">Sold</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="photo" className="block text-sm font-medium text-gray-700">Photo</label>
+              <Input
+                type="file"
+                name="photo"
+                onChange={handlePhotoChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleSubmit}>Submit</Button>
+            <DialogClose asChild>
+              <Button variant="secondary">Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ToastContainer />
     </div>

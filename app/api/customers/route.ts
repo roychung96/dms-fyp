@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabaseClient';
 
@@ -13,4 +14,12 @@ export async function POST(request: Request) {
   const { data, error } = await supabase.from('customers').insert([{ name, phone, ic, status }]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data, { status: 201 });
+}
+
+export async function PATCH(request: Request) {
+  const body = await request.json();
+  const { id, name, phone, ic, status } = body;
+  const { data, error } = await supabase.from('customers').update({ name, phone, ic, status }).eq('id', id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data, { status: 200 });
 }

@@ -93,3 +93,17 @@
     }
   }
   
+  /* global styles or relevant css file */
+
+.dropzone {
+  border: 2px dashed #ccc;
+  border-radius: 5px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.dropzone p {
+  margin: 0;
+  color: #666;
+}
