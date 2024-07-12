@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 // app/components/FileDropzone.tsx
 
 import React from 'react';
