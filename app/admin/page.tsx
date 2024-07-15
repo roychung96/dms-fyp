@@ -122,9 +122,9 @@ const AdminDashboard = () => {
     <div className="p-4 space-y-4">
       <header className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        <Button asChild>
+        {/* <Button asChild>
           <Link href="/login">Download</Link>
-        </Button>
+        </Button> */}
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

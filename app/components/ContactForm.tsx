@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 const ContactForm = () => {
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
-    message: ''
+    phone: '',
+    ic: '',
+    status: 'Hot'
   });
 
   const [submitted, setSubmitted] = useState(false);
@@ -33,7 +34,7 @@ const ContactForm = () => {
 
       if (response.ok) {
         setSubmitted(true);
-        setFormData({ name: '', email: '', message: '' });
+        setFormData({ name: '', phone: '', ic: '',status: 'Hot' });
       } else {
         const data = await response.json();
         setError(data.error || 'Something went wrong');
@@ -71,13 +72,13 @@ const ContactForm = () => {
       </div>
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-left">
-          Email
+          phone
         </label>
         <input
-          type="email"
-          id="email"
-          name="email"
-          value={formData.email}
+          type="tel"
+          id="phone"
+          name="phone"
+          value={formData.phone}
           onChange={handleChange}
           className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
           required
@@ -85,15 +86,14 @@ const ContactForm = () => {
       </div>
       <div>
         <label htmlFor="message" className="block text-sm font-medium text-left">
-          Message
+          IC
         </label>
-        <textarea
-          id="message"
-          name="message"
-          value={formData.message}
+        <input
+          id="ic"
+          name="messicage"
+          value={formData.ic}
           onChange={handleChange}
           className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-          rows={4}
           required
         />
       </div>
